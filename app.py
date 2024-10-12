@@ -44,16 +44,18 @@ if page == "Восстановить изображение":
             image = Image.fromarray(image_array.reshape(112, 112, 3))
             st.image(image, caption="Восстановленное изображение", use_column_width=True)
 
-elif page == "Получить вектор из изображения":
+if page == "Получить вектор из изображения":
     st.header("Получение вектора из изображения")
-
+    
     st.write("Загрузите изображение:")
     uploaded_image = st.file_uploader("Выберите изображение", type=["jpg", "png"])
 
     if uploaded_image is not None:
+        # Открытие и преобразование изображения
         img = Image.open(uploaded_image).convert('RGB')
-        img_tensor = transform(img).unsqueeze(0).numpy()
+        img_tensor = transform(img).unsqueeze(0).numpy()  # Добавление размерности batch
 
+        # Извлечение вектора через ONNX-модель
         input_name = session.get_inputs()[0].name
         output_name = session.get_outputs()[0].name
         vector = session.run([output_name], {input_name: img_tensor})[0]
