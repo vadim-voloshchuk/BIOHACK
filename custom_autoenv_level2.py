@@ -53,29 +53,28 @@ class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(512, 1024),  # Предполагаем, что входной вектор имеет размер 512
+            nn.Linear(512, 1024),  # Входной вектор размером 512
             nn.ReLU(),
             nn.Linear(1024, 2048),
             nn.ReLU(),
-            nn.Linear(2048, 4096),
-            nn.ReLU(),
-            nn.Linear(4096, 64 * 8 * 8)  # Измените на нужный размер для unflatten
+            nn.Linear(2048, 4096)  # Оставляем здесь 4096
         )
         
         self.conv_layers = nn.Sequential(
-            nn.Unflatten(1, (64, 8, 8)),  # Преобразуем в 64x8x8 для свёрточной обработки
+            nn.Unflatten(1, (64, 8, 8)),  # Преобразуем в 64x8x8
             nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(32, 3, kernel_size=4, stride=2, padding=1),  # Изменил размер ядра
+            nn.ConvTranspose2d(32, 3, kernel_size=4, stride=2, padding=1),
             nn.Tanh()  # Нормализация выходных данных
         )
 
     def forward(self, x):
-        print(f"Входной тензор: {x.size()}")  # Выводим размер входного тензора
+        print(f"Входной тензор: {x.size()}")  # Размер входного тензора
         x = self.encoder(x)
-        print(f"После encoder: {x.size()}")  # Проверяем размер после encoder
+        print(f"После encoder: {x.size()}")  # Размер после encoder
+        x = x.view(-1, 64, 8, 8)  # Изменяем форму на (batch_size, 64, 8, 8)
         x = self.conv_layers(x)
-        return x.view(-1, 3, 112, 112)  # Возвращаем форму (batch_size, channels, height, width)
+        return x
 
 # Определение дискриминатора
 class Discriminator(nn.Module):
