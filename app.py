@@ -77,6 +77,7 @@ if page == "Восстановить изображение":
         st.write("Полученный вектор:")
         st.write(vector)
 
+        print(vector.shape)
         if st.button("Восстановить изображение"):
             if vector.shape[0] != 512:
                 st.error(f"Ожидался вектор размера 512, получен размер {vector.shape[0]}.")
