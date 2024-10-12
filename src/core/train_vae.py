@@ -1,60 +1,47 @@
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torchvision import transforms
-from torchvision.datasets import ImageFolder
-import numpy as np
-from .VAE import VAE  # Изменение: относительный импорт VAE
+from VAE import VAE  # Импорт архитектуры VAE
+from dataset import FaceVectorDataset  # Импорт класса Dataset
+
+# Пути к обучающим и тестовым векторам
+train_vectors_dir = "data/train/vectors"
+test_vectors_dir = "data/test/vectors"
 
 # Параметры обучения
-epochs = 100
-batch_size = 64
+input_dim = 512  # Размер embedding-векторов
+latent_dim = 128  # Размер скрытого пространства
+num_epochs = 50
 learning_rate = 1e-3
-latent_dim = 128
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Пути к данным
-train_data_dir = "data/train/images" 
+# Создание датасетов и загрузчиков данных
+train_dataset = FaceVectorDataset(train_vectors_dir)
+test_dataset = FaceVectorDataset(test_vectors_dir)
 
-# Преобразования для изображений
-transform = transforms.Compose([
-    transforms.Resize((128, 128)),  # Размер, используемый в VAE
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-])
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32)
 
-# Загрузка данных
-train_dataset = ImageFolder(train_data_dir, transform=transform)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-
-# Создание модели VAE
-vae = VAE(latent_dim=latent_dim).to(device)
-
-# Оптимизатор и функция потерь
+# Инициализация модели, оптимизатора
+vae = VAE(input_dim=input_dim, latent_dim=latent_dim).to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
 optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
 
-def loss_function(recon_x, x, mu, logvar):
-    """Функция потерь VAE (ELBO)."""
-    BCE = F.binary_cross_entropy(recon_x, x, reduction='sum')  # Reconstruction loss
-    KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())  # KL divergence
-    return BCE + KLD
+# Функция обучения
+def train_vae(model, dataloader, optimizer, num_epochs):
+    model.train()
+    for epoch in range(num_epochs):
+        total_loss = 0
+        for batch in dataloader:
+            batch = batch.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+            optimizer.zero_grad()
+            recon_batch, mu, logvar = model(batch)
+            loss = model.loss_function(recon_batch, batch, mu, logvar)
+            loss.backward()
+            total_loss += loss.item()
+            optimizer.step()
+        print(f"Epoch {epoch+1}/{num_epochs}, Loss: {total_loss/len(dataloader.dataset)}")
 
-# Обучение VAE
-for epoch in range(epochs):
-    train_loss = 0
-    for batch_idx, (data, _) in enumerate(train_loader):
-        data = data.to(device)
-        optimizer.zero_grad()
-        recon_batch, mu, logvar = vae(data)
-        loss = loss_function(recon_batch, data, mu, logvar)
-        loss.backward()
-        train_loss += loss.item()
-        optimizer.step()
-
-    print(f"Epoch: {epoch+1}/{epochs}, Loss: {train_loss / len(train_loader.dataset):.4f}")
+# Запуск обучения
+train_vae(vae, train_loader, optimizer, num_epochs)
 
 # Сохранение модели
-torch.save(vae.state_dict(), "models/vae.pth")
-
-print("Обучение VAE завершено.")
+torch.save(vae.state_dict(), "vae_model.pth")
