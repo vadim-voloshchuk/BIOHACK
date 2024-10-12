@@ -5,6 +5,7 @@ from src.generate import decode_vector_to_image
 from PIL import Image
 import torchvision.transforms as transforms
 import onnxruntime as ort
+import io
 
 # Инициализация ONNX-сессии
 weights_path = "models/w600k_r50.onnx"
@@ -30,8 +31,7 @@ if page == "Восстановить изображение":
 
     if uploaded_file is not None:
         if uploaded_file.name.endswith('.npy'):
-            # Используйте BytesIO для загрузки .npy файла
-            vector = np.load(uploaded_file, allow_pickle=False)  # Изменено на allow_pickle=False для большей безопасности
+            vector = np.load(uploaded_file, allow_pickle=False)  # Убедитесь, что файл корректен
         elif uploaded_file.name.endswith('.json'):
             vector = np.array(json.load(uploaded_file))
 
@@ -40,8 +40,8 @@ if page == "Восстановить изображение":
 
         if st.button("Восстановить изображение"):
             image_array = decode_vector_to_image(vector)
-            image_array = (image_array * 255).astype(np.uint8)  # Приведение к типу uint8
-            image = Image.fromarray(image_array.reshape(112, 112, 3))  # Предполагаем, что изображение 112x112
+            image_array = (image_array * 255).astype(np.uint8)
+            image = Image.fromarray(image_array.reshape(112, 112, 3))
             st.image(image, caption="Восстановленное изображение", use_column_width=True)
 
 elif page == "Получить вектор из изображения":
@@ -51,11 +51,9 @@ elif page == "Получить вектор из изображения":
     uploaded_image = st.file_uploader("Выберите изображение", type=["jpg", "png"])
 
     if uploaded_image is not None:
-        # Открытие и преобразование изображения
         img = Image.open(uploaded_image).convert('RGB')
-        img_tensor = transform(img).unsqueeze(0).numpy()  # Добавление размерности batch
+        img_tensor = transform(img).unsqueeze(0).numpy()
 
-        # Извлечение вектора через ONNX-модель
         input_name = session.get_inputs()[0].name
         output_name = session.get_outputs()[0].name
         vector = session.run([output_name], {input_name: img_tensor})[0]
@@ -63,16 +61,17 @@ elif page == "Получить вектор из изображения":
         st.write("Извлечённый вектор:")
         st.write(vector)
 
-        # Кнопка для скачивания вектора
+        # Сохранение вектора в байтовый поток
         vector_filename = st.text_input("Введите имя файла для сохранения (без расширения):", "")
         if st.button("Скачать вектор"):
             if vector_filename:
-                np.save(f"{vector_filename}.npy", vector)  # Сохранение вектора
-                st.success(f"Вектор сохранен как {vector_filename}.npy")
+                # Создание байтового потока
+                buffer = io.BytesIO()
+                np.save(buffer, vector)  # Сохранение вектора в байтовый поток
+                buffer.seek(0)  # Перемещение указателя на начало потока
                 
-                # Создание ссылки для скачивания
-                with open(f"{vector_filename}.npy", "rb") as f:
-                    st.download_button(label="Скачать вектор в формате .npy",
-                                       data=f,
-                                       file_name=f"{vector_filename}.npy",
-                                       mime='application/octet-stream')
+                st.download_button(label="Скачать вектор в формате .npy",
+                                   data=buffer,
+                                   file_name=f"{vector_filename}.npy",
+                                   mime='application/octet-stream')
+                st.success(f"Вектор сохранен как {vector_filename}.npy")
