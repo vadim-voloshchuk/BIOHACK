@@ -8,7 +8,7 @@ import torch
 from torchvision import transforms
 
 # Путь к папке с изображениями на диске
-images_dir = "/data/img_align_celeba/img_align_celeba"
+images_dir = "data/img_align_celeba/img_align_celeba"
 
 # Путь к папке для сохранения выборок
 dataset_dir = "data"
