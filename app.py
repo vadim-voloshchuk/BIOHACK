@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import json
-from vae import decode_vector_to_image
+from src.generate import decode_vector_to_image
 from PIL import Image
 import torch
 import torchvision.transforms as transforms
