@@ -21,7 +21,7 @@ class VAE(nn.Module):
             nn.ReLU(),
             nn.Linear(128, 256),
             nn.ReLU(),
-            nn.Linear(256, input_dim),
+            nn.Linear(256, input_dim),  # Выходной размер также 512
             nn.Sigmoid()  # Для восстановления вектора
         )
 
