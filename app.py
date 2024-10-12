@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import onnxruntime as ort
 import io
-from src.generate import decode_vector_to_image
 from PIL import Image
 import torchvision.transforms as transforms
 
@@ -17,37 +16,59 @@ session = ort.InferenceSession(weights_path)
 # Настройка устройства (GPU или CPU)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# Определение архитектуры автоэнкодера
-class Autoencoder(nn.Module):
+# Определение архитектуры модели восстановления
+class AdvancedImageRestorationModel(nn.Module):
     def __init__(self):
-        super(Autoencoder, self).__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(512, 256),  # Предположим, что размер вектора 512
+        super(AdvancedImageRestorationModel, self).__init__()
+        
+        # Линейная часть для преобразования вектора в "начальное" изображение малого размера
+        self.fc = nn.Sequential(
+            nn.Linear(512, 1024),
             nn.ReLU(),
-            nn.Linear(256, 128),
+            nn.Linear(1024, 2048),
             nn.ReLU(),
-            nn.Linear(128, 64),
+            nn.Linear(2048, 256 * 7 * 7),  # Преобразуем в изображение размера 7x7 с 256 каналами
             nn.ReLU()
         )
-        self.decoder = nn.Sequential(
-            nn.Linear(64, 128),
+
+        # Блоки для прогрессивного увеличения изображения с использованием сверточных слоев
+        self.deconv_blocks = nn.Sequential(
+            # Первый блок: увеличиваем изображение до 14x14
+            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),  # 7x7 -> 14x14
+            nn.BatchNorm2d(128),
             nn.ReLU(),
-            nn.Linear(128, 256),
+            
+            # Второй блок: увеличиваем изображение до 28x28
+            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),  # 14x14 -> 28x28
+            nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.Linear(256, 512),
+            
+            # Третий блок: увеличиваем изображение до 56x56
+            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),  # 28x28 -> 56x56
+            nn.BatchNorm2d(32),
             nn.ReLU(),
-            nn.Linear(512, 3 * 112 * 112),  # Восстанавливаем изображение размером 112x112
-            nn.Tanh()  # Используем Tanh для нормализации выходных данных
+            
+            # Четвертый блок: увеличиваем изображение до 112x112
+            nn.ConvTranspose2d(32, 16, kernel_size=4, stride=2, padding=1),  # 56x56 -> 112x112
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            
+            # Последний слой: 3 канала для изображения RGB
+            nn.Conv2d(16, 3, kernel_size=3, stride=1, padding=1),  # 112x112, 3 канала (RGB)
+            nn.Tanh()  # Используем Tanh для нормализации значений в диапазон [-1, 1]
         )
 
     def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x.view(-1, 3, 112, 112)  # Возвращаем форму (batch_size, channels, height, width)
+        # Пропускаем через полносвязную сеть и изменяем форму на 256 каналов с размером 7x7
+        x = self.fc(x).view(-1, 256, 7, 7)
+        
+        # Пропускаем через сверточные транспонированные слои для увеличения изображения
+        x = self.deconv_blocks(x)
+        return x
 
 # Инициализация модели и загрузка весов
-model = Autoencoder().to(device)
-model.load_state_dict(torch.load('autoencoder.pth'))
+model = AdvancedImageRestorationModel().to(device)
+model.load_state_dict(torch.load('image_restoration_model.pth'))
 model.eval()  # Переводим модель в режим оценки
 
 # Преобразования для изображений
