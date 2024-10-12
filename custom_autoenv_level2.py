@@ -49,12 +49,11 @@ print(f"Общее количество изображений в наборе: 
 if len(train_dataset) == 0:
     raise ValueError("Набор данных пуст. Проверьте наличие изображений в папке.")
 
-# Определение генератора (автоэнкодера)
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(512, 1024),
+            nn.Linear(512, 1024),  # Предполагаем, что входной вектор имеет размер 512
             nn.ReLU(),
             nn.Linear(1024, 2048),
             nn.ReLU(),
@@ -66,7 +65,7 @@ class Generator(nn.Module):
         self.conv_layers = nn.Sequential(
             nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(32, 3, kernel_size=3, stride=2, padding=1),
+            nn.ConvTranspose2d(32, 3, kernel_size=4, stride=2, padding=1),  # Изменил размер ядра
             nn.Tanh()  # Нормализация выходных данных
         )
 
