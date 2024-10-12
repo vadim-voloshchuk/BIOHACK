@@ -5,8 +5,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset
-from PIL import Image  # Добавьте эту строку, если она отсутствует
-
+from PIL import Image
+import matplotlib.pyplot as plt
 
 # Настройка устройства (GPU или CPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -25,10 +25,7 @@ class ImageVectorDataset(Dataset):
         vector_name = os.path.join(self.vectors_dir, self.image_files[idx][:-4] + '.npy')
 
         image = Image.open(img_name).convert('RGB')
-
-        # Изменение размера изображения на 112x112
-        image = image.resize((112, 112))  # Измените размер изображения
-
+        image = image.resize((112, 112))  # Изменение размера изображения на 112x112
         image = transforms.ToTensor()(image)
 
         vector = np.load(vector_name).astype(np.float32)
@@ -77,8 +74,16 @@ model = Autoencoder().to(device)
 criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
+# Создание папки для сохранения визуализаций
+visualization_dir = "visualizations"
+os.makedirs(visualization_dir, exist_ok=True)
+
+# Список для хранения потерь
+losses = []
+
 # Обучение модели
 for epoch in range(num_epochs):
+    epoch_loss = 0  # Сумма потерь за эпоху
     for images, vectors in train_loader:
         images = images.to(device)
         vectors = vectors.to(device)
@@ -92,7 +97,32 @@ for epoch in range(num_epochs):
         loss.backward()
         optimizer.step()
 
-    print(f"Эпоха [{epoch + 1}/{num_epochs}], Потеря: {loss.item():.4f}")
+        epoch_loss += loss.item()
+
+    average_loss = epoch_loss / len(train_loader)  # Средняя потеря за эпоху
+    losses.append(average_loss)  # Сохраняем среднюю потерю
+    print(f"Эпоха [{epoch + 1}/{num_epochs}], Потеря: {average_loss:.4f}")
+
+    # Проверка качества восстановления после каждой эпохи
+    if (epoch + 1) % 5 == 0:  # Каждые 5 эпох
+        with torch.no_grad():
+            test_vectors = vectors[:5].to(device)  # Получаем первые 5 векторов
+            reconstructed_images = model(test_vectors)
+
+            # Визуализация
+            fig, ax = plt.subplots(2, 5, figsize=(15, 6))
+            for i in range(5):
+                ax[0, i].imshow(images[i].cpu().numpy().transpose(1, 2, 0))
+                ax[0, i].set_title("Оригинал")
+                ax[0, i].axis('off')
+
+                ax[1, i].imshow(reconstructed_images[i].cpu().numpy().transpose(1, 2, 0))
+                ax[1, i].set_title("Восстановленное")
+                ax[1, i].axis('off')
+
+            # Сохранение визуализации
+            plt.savefig(os.path.join(visualization_dir, f"epoch_{epoch + 1}.png"))  # Сохраняем изображение
+            plt.close()  # Закрываем фигуру
 
 print("Обучение завершено.")
 
