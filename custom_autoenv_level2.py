@@ -61,7 +61,6 @@ class Generator(nn.Module):
         )
         
         self.conv_layers = nn.Sequential(
-            nn.Unflatten(1, (64, 8, 8)),  # Преобразуем в 64x8x8
             nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.ConvTranspose2d(32, 3, kernel_size=4, stride=2, padding=1),
@@ -72,6 +71,8 @@ class Generator(nn.Module):
         print(f"Входной тензор: {x.size()}")  # Размер входного тензора
         x = self.encoder(x)
         print(f"После encoder: {x.size()}")  # Размер после encoder
+        
+        # Используем view вместо Unflatten
         x = x.view(-1, 64, 8, 8)  # Изменяем форму на (batch_size, 64, 8, 8)
         x = self.conv_layers(x)
         return x
