@@ -35,10 +35,10 @@ class ImageVectorDataset(Dataset):
         return image, vector
 
 # Параметры
-batch_size = 64
-learning_rate = 0.0002
+batch_size = 32
+learning_rate = 0.0001
 num_epochs = 50
-latent_vector_size = 64  # Размер скрытого вектора
+latent_vector_size = 128  # Размер скрытого вектора
 max_samples = 5000  # Ограничиваем количество изображений
 
 # Загрузка данных
