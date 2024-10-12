@@ -94,72 +94,73 @@ class AdvancedImageRestorationModel(nn.Module):
         # Пропускаем через сверточные транспонированные слои для увеличения изображения
         x = self.deconv_blocks(x)
         return x
-    
-# Инициализация модели, функции потерь и оптимизатора
-model = AdvancedImageRestorationModel().to(device)
-criterion = nn.MSELoss()  # Используем MSE для сравнения восстанавливаемых и реальных изображений
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-# Создание папки для сохранения визуализаций
-visualization_dir = "visualizations"
-os.makedirs(visualization_dir, exist_ok=True)
+if __name__ == "__main__":
+    # Инициализация модели, функции потерь и оптимизатора
+    model = AdvancedImageRestorationModel().to(device)
+    criterion = nn.MSELoss()  # Используем MSE для сравнения восстанавливаемых и реальных изображений
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-# Обучение модели восстановления
-for epoch in range(num_epochs):
-    for i, (vectors, images) in enumerate(train_loader):
-        vectors = vectors.to(device)
-        images = images.to(device)
-        batch_size = images.size(0)
+    # Создание папки для сохранения визуализаций
+    visualization_dir = "visualizations"
+    os.makedirs(visualization_dir, exist_ok=True)
 
-        # Прямой проход
-        optimizer.zero_grad()
-        outputs = model(vectors)
-        loss = criterion(outputs, images)
+    # Обучение модели восстановления
+    for epoch in range(num_epochs):
+        for i, (vectors, images) in enumerate(train_loader):
+            vectors = vectors.to(device)
+            images = images.to(device)
+            batch_size = images.size(0)
 
-        # Обратный проход и оптимизация
-        loss.backward()
-        optimizer.step()
+            # Прямой проход
+            optimizer.zero_grad()
+            outputs = model(vectors)
+            loss = criterion(outputs, images)
 
-        if (i + 1) % 100 == 0:  # Печатаем каждые 100 шагов
-            print(f"Эпоха [{epoch + 1}/{num_epochs}], Шаг [{i + 1}/{len(train_loader)}], Потеря: {loss.item():.4f}")
+            # Обратный проход и оптимизация
+            loss.backward()
+            optimizer.step()
 
-    # Сохранение визуализации
+            if (i + 1) % 100 == 0:  # Печатаем каждые 100 шагов
+                print(f"Эпоха [{epoch + 1}/{num_epochs}], Шаг [{i + 1}/{len(train_loader)}], Потеря: {loss.item():.4f}")
+
+        # Сохранение визуализации
+        with torch.no_grad():
+            test_vectors, test_images = next(iter(train_loader))
+            test_vectors = test_vectors.to(device)
+            generated_images = model(test_vectors)
+
+            # Визуализация
+            fig, ax = plt.subplots(2, 5, figsize=(15, 6))
+            for i in range(5):
+                ax[0, i].imshow(generated_images[i].cpu().numpy().transpose(1, 2, 0))
+                ax[0, i].set_title("Восстановленное")
+                ax[0, i].axis('off')
+
+                ax[1, i].imshow(test_images[i].cpu().numpy().transpose(1, 2, 0))
+                ax[1, i].set_title("Оригинал")
+                ax[1, i].axis('off')
+
+            plt.savefig(os.path.join(visualization_dir, f"epoch_{epoch + 1}.png"))
+            plt.close()
+
+    print("Обучение завершено.")
+
+    # Сохранение модели
+    torch.save(model.state_dict(), 'image_restoration_model.pth')
+
+    # Проверка качества восстановления
+    model.eval()
     with torch.no_grad():
         test_vectors, test_images = next(iter(train_loader))
         test_vectors = test_vectors.to(device)
         generated_images = model(test_vectors)
 
         # Визуализация
-        fig, ax = plt.subplots(2, 5, figsize=(15, 6))
+        fig, ax = plt.subplots(1, 5, figsize=(15, 3))
         for i in range(5):
-            ax[0, i].imshow(generated_images[i].cpu().numpy().transpose(1, 2, 0))
-            ax[0, i].set_title("Восстановленное")
-            ax[0, i].axis('off')
+            ax[i].imshow(generated_images[i].cpu().numpy().transpose(1, 2, 0))
+            ax[i].set_title("Восстановленное")
+            ax[i].axis('off')
 
-            ax[1, i].imshow(test_images[i].cpu().numpy().transpose(1, 2, 0))
-            ax[1, i].set_title("Оригинал")
-            ax[1, i].axis('off')
-
-        plt.savefig(os.path.join(visualization_dir, f"epoch_{epoch + 1}.png"))
-        plt.close()
-
-print("Обучение завершено.")
-
-# Сохранение модели
-torch.save(model.state_dict(), 'image_restoration_model.pth')
-
-# Проверка качества восстановления
-model.eval()
-with torch.no_grad():
-    test_vectors, test_images = next(iter(train_loader))
-    test_vectors = test_vectors.to(device)
-    generated_images = model(test_vectors)
-
-    # Визуализация
-    fig, ax = plt.subplots(1, 5, figsize=(15, 3))
-    for i in range(5):
-        ax[i].imshow(generated_images[i].cpu().numpy().transpose(1, 2, 0))
-        ax[i].set_title("Восстановленное")
-        ax[i].axis('off')
-
-    plt.show()
+        plt.show()
