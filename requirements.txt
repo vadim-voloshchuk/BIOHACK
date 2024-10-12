@@ -2,7 +2,7 @@ torch
 torchvision
 numpy
 Pillow
-insightface
+
 scikit-learn
 requests
 kaggle
