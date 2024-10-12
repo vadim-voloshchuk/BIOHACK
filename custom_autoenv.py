@@ -11,7 +11,6 @@ from PIL import Image  # Добавьте эту строку, если она �
 # Настройка устройства (GPU или CPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Пользовательский Dataset для загрузки векторов и изображений
 class ImageVectorDataset(Dataset):
     def __init__(self, images_dir, vectors_dir):
         self.images_dir = images_dir
@@ -26,6 +25,10 @@ class ImageVectorDataset(Dataset):
         vector_name = os.path.join(self.vectors_dir, self.image_files[idx][:-4] + '.npy')
 
         image = Image.open(img_name).convert('RGB')
+
+        # Изменение размера изображения на 112x112
+        image = image.resize((112, 112))  # Измените размер изображения
+
         image = transforms.ToTensor()(image)
 
         vector = np.load(vector_name).astype(np.float32)
