@@ -48,8 +48,8 @@ class Autoencoder(nn.Module):
         self.decoder = nn.Sequential(
             nn.Linear(latent_dim, 512),  # Восстанавливаем размер до 512
             nn.ReLU(),
-            nn.Unflatten(1, (512,)),  # Измените на (512,) перед `ConvTranspose2d`
-            nn.ConvTranspose2d(1, 32, kernel_size=4, stride=2, padding=1),  # Измените количество входных каналов на 1
+            nn.Unflatten(1, (1, 16, 32)),  # Измените на (1, 16, 32) в зависимости от требуемого размера
+            nn.ConvTranspose2d(1, 32, kernel_size=4, stride=2, padding=1),  # Убедитесь, что количество входных каналов равно 1
             nn.ReLU(),
             nn.ConvTranspose2d(32, 16, kernel_size=4, stride=2, padding=1),
             nn.ReLU(),
