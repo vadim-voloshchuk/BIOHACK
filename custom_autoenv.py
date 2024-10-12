@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset
+from PIL import Image  # Добавьте эту строку, если она отсутствует
+
 
 # Настройка устройства (GPU или CPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
