@@ -59,6 +59,8 @@ class Autoencoder(nn.Module):
 
     def forward(self, x):
         encoded = self.encoder(x)
+        # Убедитесь, что передаете правильный размер для decoder
+        encoded = encoded.view(-1, 128)  # или latent_dim, в зависимости от вашего выбора
         decoded = self.decoder(encoded)
         return decoded
 
