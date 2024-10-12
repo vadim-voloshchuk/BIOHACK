@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
-from torchvision import datasets, transforms
+from torchvision import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
 
@@ -32,135 +32,134 @@ class ImageVectorDataset(Dataset):
 
         vector = np.load(vector_name).astype(np.float32)
 
-        return image, vector
+        return vector, image  # Возвращаем вектор и соответствующее изображение
 
 # Параметры
 batch_size = 32
 learning_rate = 0.0001
 num_epochs = 50
-latent_vector_size = 128  # Размер скрытого вектора
+latent_vector_size = 512  # Размер вектора от модели ResNet50
 max_samples = 5000  # Ограничиваем количество изображений
 
 # Загрузка данных
 train_dataset = ImageVectorDataset('data/train/images', 'data/train/vectors', max_samples=max_samples)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-# Определение архитектуры генератора
-class Generator(nn.Module):
+# Определение архитектуры модели восстановления
+class AdvancedImageRestorationModel(nn.Module):
     def __init__(self):
-        super(Generator, self).__init__()
-        self.model = nn.Sequential(
-            nn.Linear(latent_vector_size, 128),
+        super(AdvancedImageRestorationModel, self).__init__()
+        
+        # Линейная часть для преобразования вектора в "начальное" изображение малого размера
+        self.fc = nn.Sequential(
+            nn.Linear(latent_vector_size, 1024),
             nn.ReLU(),
-            nn.Linear(128, 256),
+            nn.Linear(1024, 2048),
             nn.ReLU(),
-            nn.Linear(256, 3 * 112 * 112),  # Генерируем изображение размером 112x112
-            nn.Tanh()  # Используем Tanh для нормализации выходных данных
+            nn.Linear(2048, 256 * 7 * 7),  # Преобразуем в изображение размера 7x7 с 256 каналами
+            nn.ReLU()
+        )
+
+        # Блоки для прогрессивного увеличения изображения с использованием сверточных слоев
+        self.deconv_blocks = nn.Sequential(
+            # Первый блок: увеличиваем изображение до 14x14
+            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),  # 7x7 -> 14x14
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            
+            # Второй блок: увеличиваем изображение до 28x28
+            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),  # 14x14 -> 28x28
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            
+            # Третий блок: увеличиваем изображение до 56x56
+            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),  # 28x28 -> 56x56
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            
+            # Четвертый блок: увеличиваем изображение до 112x112
+            nn.ConvTranspose2d(32, 16, kernel_size=4, stride=2, padding=1),  # 56x56 -> 112x112
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+            
+            # Последний слой: 3 канала для изображения RGB
+            nn.Conv2d(16, 3, kernel_size=3, stride=1, padding=1),  # 112x112, 3 канала (RGB)
+            nn.Tanh()  # Используем Tanh для нормализации значений в диапазон [-1, 1]
         )
 
     def forward(self, x):
-        return self.model(x).view(-1, 3, 112, 112)
-
-# Определение архитектуры дискриминатора
-class Discriminator(nn.Module):
-    def __init__(self):
-        super(Discriminator, self).__init__()
-        self.model = nn.Sequential(
-            nn.Linear(3 * 112 * 112, 256),
-            nn.LeakyReLU(0.2),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(0.2),
-            nn.Linear(128, 1),  # Выход - вероятность
-            nn.Sigmoid()  # Используем Sigmoid для вероятности
-        )
-
-    def forward(self, x):
-        return self.model(x.view(-1, 3 * 112 * 112))
-
-# Инициализация моделей, функции потерь и оптимизаторов
-generator = Generator().to(device)
-discriminator = Discriminator().to(device)
-criterion = nn.BCELoss()
-optimizer_g = optim.Adam(generator.parameters(), lr=learning_rate)
-optimizer_d = optim.Adam(discriminator.parameters(), lr=learning_rate)
+        # Пропускаем через полносвязную сеть и изменяем форму на 256 каналов с размером 7x7
+        x = self.fc(x).view(-1, 256, 7, 7)
+        
+        # Пропускаем через сверточные транспонированные слои для увеличения изображения
+        x = self.deconv_blocks(x)
+        return x
+    
+# Инициализация модели, функции потерь и оптимизатора
+model = AdvancedImageRestorationModel().to(device)
+criterion = nn.MSELoss()  # Используем MSE для сравнения восстанавливаемых и реальных изображений
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 # Создание папки для сохранения визуализаций
 visualization_dir = "visualizations"
 os.makedirs(visualization_dir, exist_ok=True)
 
-# Обучение GAN
+# Обучение модели восстановления
 for epoch in range(num_epochs):
-    for i, (images, vectors) in enumerate(train_loader):
+    for i, (vectors, images) in enumerate(train_loader):
+        vectors = vectors.to(device)
         images = images.to(device)
         batch_size = images.size(0)
 
-        # Обучение дискриминатора
-        optimizer_d.zero_grad()
+        # Прямой проход
+        optimizer.zero_grad()
+        outputs = model(vectors)
+        loss = criterion(outputs, images)
 
-        # Реальные изображения
-        real_labels = torch.ones(batch_size, 1).to(device)
-        outputs = discriminator(images)
-        d_loss_real = criterion(outputs, real_labels)
-
-        # Генерация фейковых изображений
-        noise = torch.randn(batch_size, latent_vector_size).to(device)
-        fake_images = generator(noise)
-        fake_labels = torch.zeros(batch_size, 1).to(device)
-        outputs = discriminator(fake_images.detach())  # Не вычисляем градиенты для генератора
-        d_loss_fake = criterion(outputs, fake_labels)
-
-        # Общая потеря дискриминатора
-        d_loss = d_loss_real + d_loss_fake
-        d_loss.backward()
-        optimizer_d.step()
-
-        # Обучение генератора
-        optimizer_g.zero_grad()
-        outputs = discriminator(fake_images)
-        g_loss = criterion(outputs, real_labels)  # Генератор хочет, чтобы дискриминатор думал, что изображения реальные
-        g_loss.backward()
-        optimizer_g.step()
+        # Обратный проход и оптимизация
+        loss.backward()
+        optimizer.step()
 
         if (i + 1) % 100 == 0:  # Печатаем каждые 100 шагов
-            print(f"Эпоха [{epoch + 1}/{num_epochs}], Шаг [{i + 1}/{len(train_loader)}], Потеря D: {d_loss.item():.4f}, Потеря G: {g_loss.item():.4f}")
+            print(f"Эпоха [{epoch + 1}/{num_epochs}], Шаг [{i + 1}/{len(train_loader)}], Потеря: {loss.item():.4f}")
 
     # Сохранение визуализации
     with torch.no_grad():
-        test_noise = torch.randn(10, latent_vector_size).to(device)
-        generated_images = generator(test_noise)
+        test_vectors, test_images = next(iter(train_loader))
+        test_vectors = test_vectors.to(device)
+        generated_images = model(test_vectors)
 
         # Визуализация
         fig, ax = plt.subplots(2, 5, figsize=(15, 6))
         for i in range(5):
             ax[0, i].imshow(generated_images[i].cpu().numpy().transpose(1, 2, 0))
-            ax[0, i].set_title("Сгенерированное")
+            ax[0, i].set_title("Восстановленное")
             ax[0, i].axis('off')
 
-            ax[1, i].imshow(images[i].cpu().numpy().transpose(1, 2, 0))
+            ax[1, i].imshow(test_images[i].cpu().numpy().transpose(1, 2, 0))
             ax[1, i].set_title("Оригинал")
             ax[1, i].axis('off')
 
-        plt.savefig(os.path.join(visualization_dir, f"epoch_{epoch + 1}.png"))  # Сохраняем изображение
-        plt.close()  # Закрываем фигуру
+        plt.savefig(os.path.join(visualization_dir, f"epoch_{epoch + 1}.png"))
+        plt.close()
 
 print("Обучение завершено.")
 
-# Сохранение моделей
-torch.save(generator.state_dict(), 'generator.pth')
-torch.save(discriminator.state_dict(), 'discriminator.pth')
+# Сохранение модели
+torch.save(model.state_dict(), 'image_restoration_model.pth')
 
-# Проверка качества генерации (можно сделать на тестовом наборе)
-generator.eval()
+# Проверка качества восстановления
+model.eval()
 with torch.no_grad():
-    # Генерация изображений с помощью генератора
-    test_noise = torch.randn(5, latent_vector_size).to(device)
-    generated_images = generator(test_noise)
+    test_vectors, test_images = next(iter(train_loader))
+    test_vectors = test_vectors.to(device)
+    generated_images = model(test_vectors)
 
     # Визуализация
     fig, ax = plt.subplots(1, 5, figsize=(15, 3))
     for i in range(5):
         ax[i].imshow(generated_images[i].cpu().numpy().transpose(1, 2, 0))
-        ax[i].set_title("Сгенерированное")
+        ax[i].set_title("Восстановленное")
         ax[i].axis('off')
 
     plt.show()
