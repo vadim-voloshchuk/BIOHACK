@@ -37,9 +37,9 @@ class ImageVectorDataset(Dataset):
 # Параметры
 batch_size = 64
 learning_rate = 0.0002
-num_epochs = 100
+num_epochs = 50
 latent_vector_size = 64  # Размер скрытого вектора
-max_samples = 50000  # Ограничиваем количество изображений
+max_samples = 5000  # Ограничиваем количество изображений
 
 # Загрузка данных
 train_dataset = ImageVectorDataset('data/train/images', 'data/train/vectors', max_samples=max_samples)
