@@ -71,29 +71,32 @@ if page == "Восстановить изображение":
 
     if uploaded_file is not None:
         if uploaded_file.name.endswith('.npy'):
-            vector = np.load(uploaded_file, allow_pickle=False).astype(np.float32)  # Убедитесь, что файл корректен
+            vector = np.load(uploaded_file, allow_pickle=False).astype(np.float32)
         elif uploaded_file.name.endswith('.json'):
             vector = np.array(json.load(uploaded_file))
 
         st.write("Полученный вектор:")
         st.write(vector)
 
-        # Проверяем, что вектор имеет форму (1, 512)
+        # Проверка формы вектора
         if vector.shape != (1, 512):
             st.error(f"Ожидался вектор размера (1, 512), получен размер {vector.shape}.")
         else:
             if st.button("Восстановить изображение"):
-                vector_tensor = torch.tensor(vector).float().to(device)  # Удаляем unsqueeze, так как вектор уже имеет нужную форму
+                vector_tensor = torch.tensor(vector).float().to(device)
                 with torch.no_grad():
                     reconstructed_image = model(vector_tensor)
 
                 # Проверяем размерность выходного изображения
-                if reconstructed_image.shape[1:] != (3, 112, 112):
-                    st.error(f"Некорректная форма выходного изображения: {reconstructed_image.shape[1:]}.")
+                if reconstructed_image.shape != (1, 3, 112, 112):
+                    st.error(f"Некорректная форма выходного изображения: {reconstructed_image.shape}.")
                 else:
-                    reconstructed_image = (reconstructed_image.cpu().numpy() * 0.5 + 0.5) * 255  # Обратно в диапазон [0, 255]
+                    # Преобразование обратно в диапазон [0, 255]
+                    reconstructed_image = (reconstructed_image.cpu().numpy().squeeze() * 0.5 + 0.5) * 255
                     reconstructed_image = reconstructed_image.astype(np.uint8)
-                    image = Image.fromarray(reconstructed_image.reshape(112, 112, 3))
+
+                    # Создание и отображение изображения
+                    image = Image.fromarray(reconstructed_image.transpose(1, 2, 0))  # Преобразование в (height, width, channels)
                     st.image(image, caption="Восстановленное изображение", use_column_width=True)
 
 if page == "Получить вектор из изображения":
