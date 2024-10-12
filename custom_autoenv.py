@@ -31,6 +31,9 @@ class CustomDataset(Dataset):
         # Загружаем вектор
         vector = np.load(vector_path).astype(np.float32)
 
+        # Печать размера вектора для отладки
+        print(f"Loaded vector size: {vector.shape}")
+
         return vector, image
 
 # Определение автокодировщика
@@ -39,15 +42,23 @@ class Autoencoder(nn.Module):
         super(Autoencoder, self).__init__()
         self.encoder = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(512, latent_dim),  # Предполагаем, что размер вектора 512
+            nn.Linear(512, latent_dim),  # Убедитесь, что вектор имеет размер 512
             nn.ReLU()
         )
         self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, 512),
+            nn.Linear(latent_dim, 512),  # Восстанавливаем размер до 512
             nn.ReLU(),
-            nn.Unflatten(1, (3, 112, 112)),  # Размер выходного изображения
-            nn.ConvTranspose2d(3, 3, kernel_size=3, stride=2, padding=1),
-            nn.Sigmoid()  # Для нормализации значений пикселей
+            nn.Unflatten(1, (3, 16, 16)),  # Начальный размер для декодирования
+            nn.ConvTranspose2d(3, 3, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 32x32
+            nn.ReLU(),
+            nn.ConvTranspose2d(3, 3, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 64x64
+            nn.ReLU(),
+            nn.ConvTranspose2d(3, 3, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 128x128
+            nn.ReLU(),
+            nn.ConvTranspose2d(3, 3, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 256x256
+            nn.ReLU(),
+            nn.ConvTranspose2d(3, 3, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 512x512
+            nn.Sigmoid()  # Нормализация
         )
 
     def forward(self, x):
