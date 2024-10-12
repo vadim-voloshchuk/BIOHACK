@@ -3,7 +3,6 @@ import numpy as np
 import json
 from src.generate import decode_vector_to_image
 from PIL import Image
-import torch
 import torchvision.transforms as transforms
 import onnxruntime as ort
 
@@ -31,7 +30,8 @@ if page == "Восстановить изображение":
 
     if uploaded_file is not None:
         if uploaded_file.name.endswith('.npy'):
-            vector = np.load(uploaded_file, allow_pickle=True)  # Добавлено allow_pickle=True
+            # Используйте BytesIO для загрузки .npy файла
+            vector = np.load(uploaded_file, allow_pickle=False)  # Изменено на allow_pickle=False для большей безопасности
         elif uploaded_file.name.endswith('.json'):
             vector = np.array(json.load(uploaded_file))
 
@@ -64,10 +64,15 @@ elif page == "Получить вектор из изображения":
         st.write(vector)
 
         # Кнопка для скачивания вектора
+        vector_filename = st.text_input("Введите имя файла для сохранения (без расширения):", "")
         if st.button("Скачать вектор"):
-            vector_filename = st.text_input("Введите имя файла для сохранения (без расширения):", "")
-            vector_bytes = np.array2string(vector, separator=',').encode()
-            st.download_button(label="Скачать вектор в формате .npy",
-                               data=vector_bytes,
-                               file_name=f"{vector_filename}.npy",
-                               mime='application/octet-stream')
+            if vector_filename:
+                np.save(f"{vector_filename}.npy", vector)  # Сохранение вектора
+                st.success(f"Вектор сохранен как {vector_filename}.npy")
+                
+                # Создание ссылки для скачивания
+                with open(f"{vector_filename}.npy", "rb") as f:
+                    st.download_button(label="Скачать вектор в формате .npy",
+                                       data=f,
+                                       file_name=f"{vector_filename}.npy",
+                                       mime='application/octet-stream')
