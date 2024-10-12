@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from core.VAE import VAE
+from src.core.VAE import VAE
 
 def decode_vector_to_image(vector):
     vae = VAE()
