@@ -63,9 +63,17 @@ elif page == "Получить вектор из изображения":
         st.write("Извлечённый вектор:")
         st.write(vector)
 
+        # Кнопка для сохранения вектора
         if st.button("Сохранить вектор"):
             vector_filename = st.text_input("Введите имя файла для сохранения (без расширения):", "")
             if vector_filename:
                 np.save(f"{vector_filename}.npy", vector)
                 st.success(f"Вектор сохранен как {vector_filename}.npy")
 
+        # Кнопка для скачивания вектора
+        if st.button("Скачать вектор"):
+            vector_bytes = np.array2string(vector, separator=',').encode()
+            st.download_button(label="Скачать вектор в формате .npy",
+                               data=vector_bytes,
+                               file_name=f"{vector_filename}.npy",
+                               mime='application/octet-stream')
