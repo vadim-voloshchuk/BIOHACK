@@ -43,5 +43,9 @@ def train_vae(model, dataloader, optimizer, num_epochs):
 # Запуск обучения
 train_vae(vae, train_loader, optimizer, num_epochs)
 
-# Сохранение модели
-torch.save(vae.state_dict(), "vae_model.pth")
+# Сохранение модели и оптимизатора
+torch.save({
+    'epoch': num_epochs,
+    'model_state_dict': vae.state_dict(),
+    'optimizer_state_dict': optimizer.state_dict(),
+}, "vae_model.pth")

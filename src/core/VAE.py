@@ -53,4 +53,3 @@ class VAE(nn.Module):
         """Загрузка модели из указанного файла."""
         checkpoint = torch.load(filepath)
         self.load_state_dict(checkpoint['model_state_dict'])
-        self.eval()  # Переводим модель в режим оценки
