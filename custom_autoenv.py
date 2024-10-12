@@ -48,16 +48,14 @@ class Autoencoder(nn.Module):
         self.decoder = nn.Sequential(
             nn.Linear(latent_dim, 512),  # Восстанавливаем размер до 512
             nn.ReLU(),
-            nn.Unflatten(1, (3, 16, 16)),  # Начальный размер для декодирования
-            nn.ConvTranspose2d(3, 3, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 32x32
+            nn.Unflatten(1, (1, 512)),  # Измените на (1, 512) перед `ConvTranspose2d`
+            nn.ConvTranspose2d(1, 32, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 16x32
             nn.ReLU(),
-            nn.ConvTranspose2d(3, 3, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 64x64
+            nn.ConvTranspose2d(32, 16, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 32x64
             nn.ReLU(),
-            nn.ConvTranspose2d(3, 3, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 128x128
+            nn.ConvTranspose2d(16, 8, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 64x128
             nn.ReLU(),
-            nn.ConvTranspose2d(3, 3, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 256x256
-            nn.ReLU(),
-            nn.ConvTranspose2d(3, 3, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 512x512
+            nn.ConvTranspose2d(8, 3, kernel_size=4, stride=2, padding=1),  # Увеличиваем размер до 128x256
             nn.Sigmoid()  # Нормализация
         )
 
