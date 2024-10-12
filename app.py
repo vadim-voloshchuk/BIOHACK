@@ -1,15 +1,55 @@
 import streamlit as st
 import numpy as np
 import json
+import os
+import torch
+import torch.nn as nn
+import onnxruntime as ort
+import io
 from src.generate import decode_vector_to_image
 from PIL import Image
 import torchvision.transforms as transforms
-import onnxruntime as ort
-import io
 
 # Инициализация ONNX-сессии
 weights_path = "models/w600k_r50.onnx"
 session = ort.InferenceSession(weights_path)
+
+
+# Настройка устройства (GPU или CPU)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+# Определение архитектуры автоэнкодера
+class Autoencoder(nn.Module):
+    def __init__(self):
+        super(Autoencoder, self).__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(512, 256),  # Предположим, что размер вектора 512
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU()
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, 256),
+            nn.ReLU(),
+            nn.Linear(256, 512),
+            nn.ReLU(),
+            nn.Linear(512, 3 * 112 * 112),  # Восстанавливаем изображение размером 112x112
+            nn.Tanh()  # Используем Tanh для нормализации выходных данных
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x.view(-1, 3, 112, 112)  # Возвращаем форму (batch_size, channels, height, width)
+
+# Инициализация модели и загрузка весов
+model = Autoencoder().to(device)
+model.load_state_dict(torch.load('autoencoder.pth'))
+model.eval()  # Переводим модель в режим оценки
 
 # Преобразования для изображений
 transform = transforms.Compose([
@@ -39,9 +79,11 @@ if page == "Восстановить изображение":
         st.write(vector)
 
         if st.button("Восстановить изображение"):
-            image_array = decode_vector_to_image(vector)
-            image_array = (image_array * 255).astype(np.uint8)
-            image = Image.fromarray(image_array.reshape(112, 112, 3))
+            vector_tensor = torch.tensor(vector).float().to(device).unsqueeze(0)  # Добавляем размерность batch
+            with torch.no_grad():
+                reconstructed_image = model(vector_tensor)
+            reconstructed_image = (reconstructed_image.cpu().numpy() * 255).astype(np.uint8)
+            image = Image.fromarray(reconstructed_image.reshape(112, 112, 3))
             st.image(image, caption="Восстановленное изображение", use_column_width=True)
 
 if page == "Получить вектор из изображения":
