@@ -3,19 +3,20 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
 import matplotlib.pyplot as plt
 
 # Настройка устройства (GPU или CPU)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class ImageVectorDataset(Dataset):
-    def __init__(self, images_dir, vectors_dir):
+    def __init__(self, images_dir, vectors_dir, max_samples=None):
         self.images_dir = images_dir
         self.vectors_dir = vectors_dir
         self.image_files = [f for f in os.listdir(images_dir) if f.endswith('.jpg')]
+        if max_samples is not None:
+            self.image_files = self.image_files[:max_samples]  # Ограничиваем размер выборки
 
     def __len__(self):
         return len(self.image_files)
@@ -36,9 +37,10 @@ class ImageVectorDataset(Dataset):
 batch_size = 32
 learning_rate = 0.001
 num_epochs = 20
+max_samples = 100  # Ограничиваем количество изображений
 
 # Загрузка данных
-train_dataset = ImageVectorDataset('data/train/images', 'data/train/vectors')
+train_dataset = ImageVectorDataset('data/train/images', 'data/train/vectors', max_samples=max_samples)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 # Определение архитектуры автоэнкодера
@@ -133,7 +135,7 @@ torch.save(model.state_dict(), 'autoencoder.pth')
 model.eval()
 with torch.no_grad():
     # Загрузите векторы тестовой выборки и проверьте восстановление изображений
-    test_dataset = ImageVectorDataset('data/test/images', 'data/test/vectors')
+    test_dataset = ImageVectorDataset('data/test/images', 'data/test/vectors', max_samples=max_samples)
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
     for images, vectors in test_loader:
