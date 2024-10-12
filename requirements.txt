@@ -2,6 +2,8 @@ torch
 torchvision
 numpy
 Pillow
+onnxruntime
+opencv-python
 
 scikit-learn
 requests
