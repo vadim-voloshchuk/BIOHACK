@@ -4,6 +4,7 @@ numpy
 Pillow
 onnxruntime
 opencv-python
+matplotlib
 
 scikit-learn
 requests
