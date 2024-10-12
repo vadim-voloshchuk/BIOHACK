@@ -35,10 +35,10 @@ class ImageVectorDataset(Dataset):
         return image, vector
 
 # Параметры
-batch_size = 32
+batch_size = 64
 learning_rate = 0.001
-num_epochs = 20
-max_samples = 5000  # Ограничиваем количество изображений
+num_epochs = 100
+max_samples = 50000  # Ограничиваем количество изображений
 
 # Загрузка данных
 train_dataset = ImageVectorDataset('data/train/images', 'data/train/vectors', max_samples=max_samples)
