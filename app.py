@@ -14,7 +14,6 @@ import torchvision.transforms as transforms
 weights_path = "models/w600k_r50.onnx"
 session = ort.InferenceSession(weights_path)
 
-
 # Настройка устройства (GPU или CPU)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -79,12 +78,21 @@ if page == "Восстановить изображение":
         st.write(vector)
 
         if st.button("Восстановить изображение"):
-            vector_tensor = torch.tensor(vector).float().to(device).unsqueeze(0)  # Добавляем размерность batch
-            with torch.no_grad():
-                reconstructed_image = model(vector_tensor)
-            reconstructed_image = (reconstructed_image.cpu().numpy() * 255).astype(np.uint8)
-            image = Image.fromarray(reconstructed_image.reshape(112, 112, 3))
-            st.image(image, caption="Восстановленное изображение", use_column_width=True)
+            if vector.shape[0] != 512:
+                st.error(f"Ожидался вектор размера 512, получен размер {vector.shape[0]}.")
+            else:
+                vector_tensor = torch.tensor(vector).float().to(device).unsqueeze(0)  # Добавляем размерность batch
+                with torch.no_grad():
+                    reconstructed_image = model(vector_tensor)
+
+                # Проверяем размерность выходного изображения
+                if reconstructed_image.shape[1:] != (3, 112, 112):
+                    st.error(f"Некорректная форма выходного изображения: {reconstructed_image.shape[1:]}.")
+                else:
+                    reconstructed_image = (reconstructed_image.cpu().numpy() * 0.5 + 0.5) * 255  # Обратно в диапазон [0, 255]
+                    reconstructed_image = reconstructed_image.astype(np.uint8)
+                    image = Image.fromarray(reconstructed_image.reshape(112, 112, 3))
+                    st.image(image, caption="Восстановленное изображение", use_column_width=True)
 
 if page == "Получить вектор из изображения":
     st.header("Получение вектора из изображения")
@@ -105,7 +113,6 @@ if page == "Получить вектор из изображения":
         st.write("Извлечённый вектор:")
         st.write(vector)
         st.write("Форма вектора:", vector.shape)  # Вывод формы вектора
-
 
         # Сохранение вектора в байтовый поток
         vector_filename = st.text_input("Введите имя файла для сохранения (без расширения):", "")
