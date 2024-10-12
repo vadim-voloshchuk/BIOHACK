@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import json
-from src.generate import decode_vector_to_image
+from vae import decode_vector_to_image
 from PIL import Image
 import torch
 import torchvision.transforms as transforms
@@ -31,7 +31,7 @@ if page == "Восстановить изображение":
 
     if uploaded_file is not None:
         if uploaded_file.name.endswith('.npy'):
-            vector = np.load(uploaded_file)
+            vector = np.load(uploaded_file, allow_pickle=True)  # Добавлено allow_pickle=True
         elif uploaded_file.name.endswith('.json'):
             vector = np.array(json.load(uploaded_file))
 
