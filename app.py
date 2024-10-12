@@ -71,7 +71,7 @@ if page == "Восстановить изображение":
 
     if uploaded_file is not None:
         if uploaded_file.name.endswith('.npy'):
-            vector = np.load(uploaded_file, allow_pickle=False)  # Убедитесь, что файл корректен
+            vector = np.load(uploaded_file, allow_pickle=False).astype(np.float32)  # Убедитесь, что файл корректен
         elif uploaded_file.name.endswith('.json'):
             vector = np.array(json.load(uploaded_file))
 
