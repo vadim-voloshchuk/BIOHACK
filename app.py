@@ -59,9 +59,6 @@ transform = transforms.Compose([
 
 st.title("VAE Image Processing")
 
-# Страница для восстановления изображения из вектора
-page = st.sidebar.selectbox("Выберите действие", ["Восстановить изображение", "Получить вектор из изображения"])
-
 if page == "Восстановить изображение":
     st.header("Восстановление изображения из вектора")
 
@@ -77,12 +74,12 @@ if page == "Восстановить изображение":
         st.write("Полученный вектор:")
         st.write(vector)
 
-        print(vector.shape)
-        if st.button("Восстановить изображение"):
-            if vector.shape[0] != 512:
-                st.error(f"Ожидался вектор размера 512, получен размер {vector.shape[0]}.")
-            else:
-                vector_tensor = torch.tensor(vector).float().to(device).unsqueeze(0)  # Добавляем размерность batch
+        # Проверяем, что вектор имеет форму (1, 512)
+        if vector.shape != (1, 512):
+            st.error(f"Ожидался вектор размера (1, 512), получен размер {vector.shape}.")
+        else:
+            if st.button("Восстановить изображение"):
+                vector_tensor = torch.tensor(vector).float().to(device)  # Удаляем unsqueeze, так как вектор уже имеет нужную форму
                 with torch.no_grad():
                     reconstructed_image = model(vector_tensor)
 
