@@ -3,109 +3,106 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
-from PIL import Image
 
-# Кастомный датасет
-class CustomDataset(Dataset):
-    def __init__(self, images_dir, vectors_dir, transform=None):
+# Настройка устройства (GPU или CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Пользовательский Dataset для загрузки векторов и изображений
+class ImageVectorDataset(Dataset):
+    def __init__(self, images_dir, vectors_dir):
         self.images_dir = images_dir
         self.vectors_dir = vectors_dir
-        self.image_files = [f for f in os.listdir(images_dir) if f.endswith(('.jpg', '.png'))]
-        self.transform = transform
+        self.image_files = [f for f in os.listdir(images_dir) if f.endswith('.jpg')]
 
     def __len__(self):
         return len(self.image_files)
 
     def __getitem__(self, idx):
-        img_name = self.image_files[idx]
-        img_path = os.path.join(self.images_dir, img_name)
-        vector_path = os.path.join(self.vectors_dir, img_name[:-4] + ".npy")
+        img_name = os.path.join(self.images_dir, self.image_files[idx])
+        vector_name = os.path.join(self.vectors_dir, self.image_files[idx][:-4] + '.npy')
 
-        # Загружаем изображение
-        image = Image.open(img_path).convert('RGB')
-        if self.transform:
-            image = self.transform(image)
+        image = Image.open(img_name).convert('RGB')
+        image = transforms.ToTensor()(image)
 
-        # Загружаем вектор
-        vector = np.load(vector_path).astype(np.float32)
+        vector = np.load(vector_name).astype(np.float32)
 
-        # Печать размера вектора для отладки
-        print(f"Loaded vector size: {vector.shape}")
+        return image, vector
 
-        return vector, image
+# Параметры
+batch_size = 32
+learning_rate = 0.001
+num_epochs = 20
 
-# Определение автокодировщика
+# Загрузка данных
+train_dataset = ImageVectorDataset('data/train/images', 'data/train/vectors')
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+# Определение архитектуры автоэнкодера
 class Autoencoder(nn.Module):
-    def __init__(self, latent_dim):
+    def __init__(self):
         super(Autoencoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(512, latent_dim),  # Убедитесь, что вектор имеет размер 512
+            nn.Linear(512, 256),  # Предположим, что размер вектора 512
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
             nn.ReLU()
         )
         self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, 512),  # Восстанавливаем размер до 512
+            nn.Linear(64, 128),
             nn.ReLU(),
-            nn.Unflatten(1, (1, 16, 32)),  # Измените на (1, 16, 32) в зависимости от требуемого размера
-            nn.ConvTranspose2d(1, 32, kernel_size=4, stride=2, padding=1),  # Убедитесь, что количество входных каналов равно 1
+            nn.Linear(128, 256),
             nn.ReLU(),
-            nn.ConvTranspose2d(32, 16, kernel_size=4, stride=2, padding=1),
+            nn.Linear(256, 512),
             nn.ReLU(),
-            nn.ConvTranspose2d(16, 3, kernel_size=4, stride=2, padding=1),  # Возвращаем к 3 каналам
-            nn.Sigmoid()  # Нормализация
+            nn.Linear(512, 3 * 112 * 112),  # Восстанавливаем изображение размером 112x112
+            nn.Tanh()  # Используем Tanh для нормализации выходных данных
         )
 
     def forward(self, x):
-        encoded = self.encoder(x)
-        # Убедитесь, что передаете правильный размер для decoder
-        encoded = encoded.view(-1, 128)  # или latent_dim, в зависимости от вашего выбора
-        decoded = self.decoder(encoded)
-        return decoded
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x.view(-1, 3, 112, 112)  # Возвращаем форму (batch_size, channels, height, width)
 
-# Параметры
-latent_dim = 128  # Размер вектора
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# Преобразования для изображений
-transform = transforms.Compose([
-    transforms.Resize((112, 112)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-])
-
-# Загрузка данных
-train_images_dir = "data/train/images"
-train_vectors_dir = "data/train/vectors"
-train_dataset = CustomDataset(train_images_dir, train_vectors_dir, transform=transform)
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-
-# Инициализация модели, потерь и оптимизатора
-model = Autoencoder(latent_dim).to(device)
+# Инициализация модели, функции потерь и оптимизатора
+model = Autoencoder().to(device)
 criterion = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-# Обучение
-num_epochs = 50
+# Обучение модели
 for epoch in range(num_epochs):
-    for vectors, images in train_loader:
-        vectors, images = vectors.to(device), images.to(device)
-
-        # Обнуление градиентов
-        optimizer.zero_grad()
+    for images, vectors in train_loader:
+        images = images.to(device)
+        vectors = vectors.to(device)
 
         # Прямой проход
         outputs = model(vectors)
-
-        # Вычисление потерь
         loss = criterion(outputs, images)
-        
-        # Обратный проход и оптимизация
+
+        # Обратное распространение и оптимизация
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")
+    print(f"Эпоха [{epoch + 1}/{num_epochs}], Потеря: {loss.item():.4f}")
+
+print("Обучение завершено.")
 
 # Сохранение модели
 torch.save(model.state_dict(), 'autoencoder.pth')
+
+# Проверка качества восстановления (можно сделать на тестовом наборе)
+model.eval()
+with torch.no_grad():
+    # Загрузите векторы тестовой выборки и проверьте восстановление изображений
+    test_dataset = ImageVectorDataset('data/test/images', 'data/test/vectors')
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+    for images, vectors in test_loader:
+        vectors = vectors.to(device)
+        reconstructed_images = model(vectors)
+
+        # Здесь вы можете сравнить reconstructed_images с оригинальными images
