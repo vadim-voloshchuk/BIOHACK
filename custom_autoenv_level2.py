@@ -37,9 +37,9 @@ class ImageVectorDataset(Dataset):
 # Параметры
 batch_size = 32
 learning_rate = 0.0001
-num_epochs = 50
+num_epochs = 75
 latent_vector_size = 512  # Размер вектора от модели ResNet50
-max_samples = 5000  # Ограничиваем количество изображений
+max_samples = 25000  # Ограничиваем количество изображений
 
 # Загрузка данных
 train_dataset = ImageVectorDataset('data/train/images', 'data/train/vectors', max_samples=max_samples)
