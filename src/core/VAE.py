@@ -48,3 +48,9 @@ class VAE(nn.Module):
         recon_loss = nn.functional.mse_loss(recon_x, x, reduction='sum')
         kl_divergence = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         return recon_loss + kl_divergence
+
+    def load_model(self, filepath):
+        """Загрузка модели из указанного файла."""
+        checkpoint = torch.load(filepath)
+        self.load_state_dict(checkpoint['model_state_dict'])
+        self.eval()  # Переводим модель в режим оценки
