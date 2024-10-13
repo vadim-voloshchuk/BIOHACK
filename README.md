@@ -26,7 +26,7 @@ BIOHACK/
 
 ## Установка 🧰
 
-1. Клонируйте репозиторий: `git clone https://github.com/your_username/BIOHACK.git`
+1. Клонируйте репозиторий: `git clone https://github.com/vadim-voloshchuk/BIOHACK.git`
 2. Создайте виртуальное окружение: `python3 -m venv biovenv`
 3. Активируйте виртуальное окружение: 
    - Linux/macOS: `source biovenv/bin/activate`
