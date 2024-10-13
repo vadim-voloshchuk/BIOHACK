@@ -1,51 +1,79 @@
+import os
+import numpy as np
 import torch
+import torch.nn as nn
 import torch.optim as optim
+import matplotlib.pyplot as plt
+
+from dataset import ImageVectorDataset
+from model import AdvancedImageRestorationModel
 from torch.utils.data import DataLoader
-from VAE import VAE  # Импорт архитектуры VAE
-from dataset import FaceVectorDataset  # Импорт класса Dataset
 
-# Пути к обучающим и тестовым векторам
-train_vectors_dir = "data/train/vectors"
-test_vectors_dir = "data/test/vectors"
 
-# Параметры обучения
-input_dim = 512  # Размер embedding-векторов
-latent_dim = 128  # Размер скрытого пространства
-num_epochs = 50
-learning_rate = 1e-3
+# Настройка устройства (GPU или CPU)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# Создание датасетов и загрузчиков данных
-train_dataset = FaceVectorDataset(train_vectors_dir)
-test_dataset = FaceVectorDataset(test_vectors_dir)
+# Параметры
+batch_size = 32
+learning_rate = 0.0001
+num_epochs = 75
+latent_vector_size = 512  # Размер вектора от модели ResNet50
+max_samples = 25000  # Ограничиваем количество изображений
 
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=32)
+# Загрузка данных
+train_dataset = ImageVectorDataset('data/train/images', 'data/train/vectors', max_samples=max_samples)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-# Инициализация модели, оптимизатора
-vae = VAE(input_dim=input_dim, latent_dim=latent_dim).to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
-optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
+if __name__ == "__main__":
+    # Инициализация модели, функции потерь и оптимизатора
+    model = AdvancedImageRestorationModel().to(device)
+    criterion = nn.MSELoss()  # Используем MSE для сравнения восстанавливаемых и реальных изображений
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-# Функция обучения
-def train_vae(model, dataloader, optimizer, num_epochs):
-    model.train()
+    # Создание папки для сохранения визуализаций
+    visualization_dir = "visualizations"
+    os.makedirs(visualization_dir, exist_ok=True)
+
+    # Обучение модели восстановления
     for epoch in range(num_epochs):
-        total_loss = 0
-        for batch in dataloader:
-            batch = batch.to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
+        for i, (vectors, images) in enumerate(train_loader):
+            vectors = vectors.to(device)
+            images = images.to(device)
+            batch_size = images.size(0)
+
+            # Прямой проход
             optimizer.zero_grad()
-            recon_batch, mu, logvar = model(batch)
-            loss = model.loss_function(recon_batch, batch, mu, logvar)
+            outputs = model(vectors)
+            loss = criterion(outputs, images)
+
+            # Обратный проход и оптимизация
             loss.backward()
-            total_loss += loss.item()
             optimizer.step()
-        print(f"Epoch {epoch+1}/{num_epochs}, Loss: {total_loss/len(dataloader.dataset)}")
 
-# Запуск обучения
-train_vae(vae, train_loader, optimizer, num_epochs)
+            if (i + 1) % 100 == 0:  # Печатаем каждые 100 шагов
+                print(f"Эпоха [{epoch + 1}/{num_epochs}], Шаг [{i + 1}/{len(train_loader)}], Потеря: {loss.item():.4f}")
 
-# Сохранение модели и оптимизатора
-torch.save({
-    'epoch': num_epochs,
-    'model_state_dict': vae.state_dict(),
-    'optimizer_state_dict': optimizer.state_dict(),
-}, "vae_model.pth")
+        # Сохранение визуализации
+        with torch.no_grad():
+            test_vectors, test_images = next(iter(train_loader))
+            test_vectors = test_vectors.to(device)
+            generated_images = model(test_vectors)
+
+            # Визуализация
+            fig, ax = plt.subplots(2, 5, figsize=(15, 6))
+            for i in range(5):
+                ax[0, i].imshow(generated_images[i].cpu().numpy().transpose(1, 2, 0))
+                ax[0, i].set_title("Восстановленное")
+                ax[0, i].axis('off')
+
+                ax[1, i].imshow(test_images[i].cpu().numpy().transpose(1, 2, 0))
+                ax[1, i].set_title("Оригинал")
+                ax[1, i].axis('off')
+
+            plt.savefig(os.path.join(visualization_dir, f"epoch_{epoch + 1}.png"))
+            plt.close()
+
+    print("Обучение завершено.")
+
+    # Сохранение модели
+    torch.save(model.state_dict(), 'models/image_restoration_model.pth')
